@@ -1,0 +1,73 @@
+# ============================================================
+# API Gateway — Deployment (ADR-001, ADR-004)
+# Single external entry point. Enforces JWT auth + RBAC.
+# Routes /api/loans/** → lb://loan-service
+#         /api/equipment/** → lb://inventory-service
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: eelp-production
+  labels:
+    app: api-gateway
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      initContainers:
+        - name: wait-for-loan-service
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://loan-service:8081/actuator/health 2>/dev/null | grep -q UP; do echo waiting for loan-service; sleep 5; done']
+        - name: wait-for-inventory-service
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://inventory-service:8082/actuator/health 2>/dev/null | grep -q UP; do echo waiting for inventory-service; sleep 5; done']
+      containers:
+        - name: api-gateway
+          image: ghcr.io/vinayreddy072/api-gateway:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            # JWT_SECRET is REQUIRED — gateway refuses to start if absent (ADR-001)
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8080
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "250m"
+            limits:
+              memory: "768Mi"
+              cpu: "750m"

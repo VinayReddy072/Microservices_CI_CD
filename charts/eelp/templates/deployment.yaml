@@ -1,0 +1,250 @@
+{{/*
+  ============================================================
+  Deployments template — renders Deployment for each enabled service.
+  All 5 Spring Boot services share the same pattern.
+  ============================================================
+*/}}
+
+{{- if .Values.eureka.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: eureka-server
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: eureka-server
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.eureka.replicaCount }}
+  selector:
+    matchLabels:
+      app: eureka-server
+  template:
+    metadata:
+      labels:
+        app: eureka-server
+    spec:
+      containers:
+        - name: eureka-server
+          image: {{ include "eelp.image" (dict "registry" .Values.global.imageRegistry "name" .Values.eureka.image "tag" .Values.global.imageTag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.eureka.port }}
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          {{- include "eelp.readinessProbe" (dict "port" .Values.eureka.port "delay" 30) | nindent 10 }}
+          {{- include "eelp.livenessProbe" (dict "port" .Values.eureka.port "delay" 60) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.eureka.resources | nindent 12 }}
+{{- end }}
+
+{{- if .Values.configServer.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: config-server
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.configServer.replicaCount }}
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      containers:
+        - name: config-server
+          image: {{ include "eelp.image" (dict "registry" .Values.global.imageRegistry "name" .Values.configServer.image "tag" .Values.global.imageTag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.configServer.port }}
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: JWT_SECRET
+          {{- include "eelp.readinessProbe" (dict "port" .Values.configServer.port "delay" 30) | nindent 10 }}
+          {{- include "eelp.livenessProbe" (dict "port" .Values.configServer.port "delay" 60) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.configServer.resources | nindent 12 }}
+{{- end }}
+
+{{- if .Values.inventoryService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: inventory-service
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.inventoryService.replicaCount }}
+  selector:
+    matchLabels:
+      app: inventory-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      containers:
+        - name: inventory-service
+          image: {{ include "eelp.image" (dict "registry" .Values.global.imageRegistry "name" .Values.inventoryService.image "tag" .Values.global.imageTag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.inventoryService.port }}
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: INVENTORY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_USER
+            - name: INVENTORY_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_PASS
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_PASSWORD
+          {{- include "eelp.readinessProbe" (dict "port" .Values.inventoryService.port "delay" 30) | nindent 10 }}
+          {{- include "eelp.livenessProbe" (dict "port" .Values.inventoryService.port "delay" 90) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.inventoryService.resources | nindent 12 }}
+{{- end }}
+
+{{- if .Values.loanService.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loan-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: loan-service
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.loanService.replicaCount }}
+  selector:
+    matchLabels:
+      app: loan-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: loan-service
+    spec:
+      containers:
+        - name: loan-service
+          image: {{ include "eelp.image" (dict "registry" .Values.global.imageRegistry "name" .Values.loanService.image "tag" .Values.global.imageTag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.loanService.port }}
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: LOAN_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_USER
+            - name: LOAN_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_PASS
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_PASSWORD
+          {{- include "eelp.readinessProbe" (dict "port" .Values.loanService.port "delay" 30) | nindent 10 }}
+          {{- include "eelp.livenessProbe" (dict "port" .Values.loanService.port "delay" 90) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.loanService.resources | nindent 12 }}
+{{- end }}
+
+{{- if .Values.gateway.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: api-gateway
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.gateway.replicaCount }}
+  selector:
+    matchLabels:
+      app: api-gateway
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+    spec:
+      containers:
+        - name: api-gateway
+          image: {{ include "eelp.image" (dict "registry" .Values.global.imageRegistry "name" .Values.gateway.image "tag" .Values.global.imageTag) }}
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - containerPort: {{ .Values.gateway.port }}
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: JWT_SECRET
+          {{- include "eelp.readinessProbe" (dict "port" .Values.gateway.port "delay" 30) | nindent 10 }}
+          {{- include "eelp.livenessProbe" (dict "port" .Values.gateway.port "delay" 90) | nindent 10 }}
+          resources:
+            {{- toYaml .Values.gateway.resources | nindent 12 }}
+{{- end }}

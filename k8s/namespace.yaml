@@ -1,0 +1,13 @@
+# ============================================================
+# Kubernetes Namespace — eelp-production
+# All EELP resources are deployed into this namespace.
+# Domain services are isolated from other workloads in the cluster.
+# ADR-001: only api-gateway is exposed externally (via NodePort/LoadBalancer).
+# ============================================================
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: eelp-production
+  labels:
+    app.kubernetes.io/part-of: eelp
+    environment: production

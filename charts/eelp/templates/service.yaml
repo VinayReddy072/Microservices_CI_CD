@@ -1,0 +1,105 @@
+{{/*
+  ============================================================
+  Services template — renders Kubernetes Service for each enabled service.
+  ============================================================
+*/}}
+
+{{- if .Values.eureka.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: eureka-server
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: eureka-server
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: eureka-server
+  ports:
+    - name: eureka
+      port: {{ .Values.eureka.port }}
+      targetPort: {{ .Values.eureka.port }}
+{{- end }}
+
+{{- if .Values.configServer.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: config-server
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: config-server
+  ports:
+    - name: config
+      port: {{ .Values.configServer.port }}
+      targetPort: {{ .Values.configServer.port }}
+{{- end }}
+
+{{- if .Values.inventoryService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: inventory-service
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory-service
+  ports:
+    - name: http
+      port: {{ .Values.inventoryService.port }}
+      targetPort: {{ .Values.inventoryService.port }}
+{{- end }}
+
+{{- if .Values.loanService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: loan-service
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: loan-service
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    app: loan-service
+  ports:
+    - name: http
+      port: {{ .Values.loanService.port }}
+      targetPort: {{ .Values.loanService.port }}
+{{- end }}
+
+{{- if .Values.gateway.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: api-gateway
+    {{- include "eelp.labels" . | nindent 4 }}
+spec:
+  type: {{ .Values.gateway.serviceType }}
+  selector:
+    app: api-gateway
+  ports:
+    - name: http
+      port: 80
+      targetPort: {{ .Values.gateway.port }}
+{{- end }}

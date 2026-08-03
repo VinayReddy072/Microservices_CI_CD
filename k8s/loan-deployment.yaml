@@ -1,0 +1,96 @@
+# ============================================================
+# Loan Service — Deployment (ADR-002, ADR-003, ADR-004, ADR-005)
+# - Manages loan lifecycle in loan_db (ADR-005)
+# - Calls inventory-service via Feign (synchronous availability check)
+# - Publishes loan.approved / loan.returned events to RabbitMQ (ADR-002)
+# - Resilience4J: retry, circuit breaker, rate limiter, bulkhead (ADR-003)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: loan-service
+  namespace: eelp-production
+  labels:
+    app: loan-service
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: loan-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        app: loan-service
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://config-server:8888/actuator/health 2>/dev/null | grep -q UP; do echo waiting for config-server; sleep 5; done']
+        - name: wait-for-rabbitmq
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 5; done']
+        - name: wait-for-mysql
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until nc -z mysql-loan 3306; do echo waiting for mysql; sleep 5; done']
+        - name: wait-for-inventory
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://inventory-service:8082/actuator/health 2>/dev/null | grep -q UP; do echo waiting for inventory-service; sleep 5; done']
+      containers:
+        - name: loan-service
+          image: ghcr.io/vinayreddy072/loan-service:latest
+          ports:
+            - containerPort: 8081
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: LOAN_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_USER
+            - name: LOAN_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_PASS
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8081
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "250m"
+            limits:
+              memory: "768Mi"
+              cpu: "750m"

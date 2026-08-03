@@ -1,0 +1,24 @@
+apiVersion: v2
+name: eelp
+description: |
+  Emergency Equipment Lending Platform — Helm Chart.
+  Packages all 5 Spring Boot microservices (eureka-server, config-server,
+  api-gateway, loan-service, inventory-service) plus infrastructure
+  (MySQL ×2, RabbitMQ, Zipkin) into a single deployable unit.
+
+type: application
+
+# SemVer chart version — increment on chart changes
+version: 1.0.0
+
+# App version corresponds to the Docker image tag
+appVersion: "latest"
+
+keywords:
+  - spring-boot
+  - microservices
+  - emergency-lending
+
+maintainers:
+  - name: VinayReddy072
+    url: https://github.com/VinayReddy072/Microservices_CI_CD

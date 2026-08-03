@@ -1,0 +1,8 @@
+# Zipkin service is already bundled in zipkin-deployment.yaml.
+# This file is intentionally minimal — it's a re-export for tools
+# that expect deployment and service in separate files.
+# See zipkin-deployment.yaml for the full resource definitions.
+#
+# The Zipkin Service is defined at the bottom of k8s/zipkin-deployment.yaml
+# as a combined manifest (---separator). This is a common pattern for
+# small stateless infrastructure components.

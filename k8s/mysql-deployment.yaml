@@ -1,0 +1,84 @@
+# ============================================================
+# MySQL — Inventory Database (ADR-005: Database-per-Service)
+# Separate MySQL instance for inventory_db.
+# inventory_user has GRANT ALL on inventory_db only — no access to loan_db.
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-inventory
+  namespace: eelp-production
+  labels:
+    app: mysql-inventory
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-inventory
+  strategy:
+    type: Recreate   # Recreate (not rolling) — MySQL can't run with 2 writers safely
+  template:
+    metadata:
+      labels:
+        app: mysql-inventory
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: inventory_db
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_PASS
+          volumeMounts:
+            - name: mysql-inventory-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: mysql-inventory-data
+          persistentVolumeClaim:
+            claimName: mysql-inventory-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-inventory-pvc
+  namespace: eelp-production
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi

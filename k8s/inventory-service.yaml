@@ -1,0 +1,22 @@
+# ============================================================
+# Inventory Service — Service (ADR-004)
+# ClusterIP — internal only. Loan Service reaches it via Eureka lb://inventory-service.
+# ADR-001: Domain service ports are NOT externally exposed.
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: inventory-service
+  namespace: eelp-production
+  labels:
+    app: inventory-service
+    app.kubernetes.io/part-of: eelp
+spec:
+  type: ClusterIP
+  selector:
+    app: inventory-service
+  ports:
+    - name: http
+      protocol: TCP
+      port: 8082
+      targetPort: 8082

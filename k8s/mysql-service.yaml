@@ -1,0 +1,124 @@
+# ============================================================
+# Services for MySQL databases (ADR-005)
+# ClusterIP services — internal-only, no external exposure.
+# ============================================================
+
+# ── Inventory DB service ──────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-inventory
+  namespace: eelp-production
+  labels:
+    app: mysql-inventory
+    app.kubernetes.io/part-of: eelp
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql-inventory
+  ports:
+    - name: mysql
+      protocol: TCP
+      port: 3306
+      targetPort: 3306
+
+---
+# ── Loan DB deployment ────────────────────────────────────────
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql-loan
+  namespace: eelp-production
+  labels:
+    app: mysql-loan
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql-loan
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: mysql-loan
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.4
+          ports:
+            - containerPort: 3306
+          env:
+            - name: MYSQL_ROOT_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: MYSQL_ROOT_PASSWORD
+            - name: MYSQL_DATABASE
+              value: loan_db
+            - name: MYSQL_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_USER
+            - name: MYSQL_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_PASS
+          volumeMounts:
+            - name: mysql-loan-data
+              mountPath: /var/lib/mysql
+          readinessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 20
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["mysqladmin", "ping", "-h", "localhost"]
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+      volumes:
+        - name: mysql-loan-data
+          persistentVolumeClaim:
+            claimName: mysql-loan-pvc
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mysql-loan-pvc
+  namespace: eelp-production
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+---
+# ── Loan DB service ───────────────────────────────────────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql-loan
+  namespace: eelp-production
+  labels:
+    app: mysql-loan
+    app.kubernetes.io/part-of: eelp
+spec:
+  type: ClusterIP
+  selector:
+    app: mysql-loan
+  ports:
+    - name: mysql
+      protocol: TCP
+      port: 3306
+      targetPort: 3306

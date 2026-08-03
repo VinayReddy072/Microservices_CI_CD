@@ -1,0 +1,112 @@
+# ============================================================
+# Helm values.yaml — EELP Platform defaults
+# Override per environment:
+#   helm upgrade --install eelp ./charts/eelp -f values-prod.yaml
+# ============================================================
+
+global:
+  imageRegistry: ghcr.io/vinayreddy072
+  imageTag: latest
+  imagePullPolicy: Always
+  namespace: eelp-production
+
+# ── Eureka Server ────────────────────────────────────────────
+eureka:
+  enabled: true
+  image: eureka-server
+  replicaCount: 1
+  port: 8761
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+# ── Config Server ─────────────────────────────────────────────
+configServer:
+  enabled: true
+  image: config-server
+  replicaCount: 1
+  port: 8888
+  resources:
+    requests:
+      memory: 256Mi
+      cpu: 250m
+    limits:
+      memory: 512Mi
+      cpu: 500m
+
+# ── API Gateway ───────────────────────────────────────────────
+gateway:
+  enabled: true
+  image: api-gateway
+  replicaCount: 2
+  port: 8080
+  serviceType: LoadBalancer   # NodePort for bare-metal
+  resources:
+    requests:
+      memory: 384Mi
+      cpu: 250m
+    limits:
+      memory: 768Mi
+      cpu: 750m
+
+# ── Inventory Service ─────────────────────────────────────────
+inventoryService:
+  enabled: true
+  image: inventory-service
+  replicaCount: 2
+  port: 8082
+  resources:
+    requests:
+      memory: 384Mi
+      cpu: 250m
+    limits:
+      memory: 768Mi
+      cpu: 750m
+
+# ── Loan Service ──────────────────────────────────────────────
+loanService:
+  enabled: true
+  image: loan-service
+  replicaCount: 2
+  port: 8081
+  resources:
+    requests:
+      memory: 384Mi
+      cpu: 250m
+    limits:
+      memory: 768Mi
+      cpu: 750m
+
+# ── MySQL ─────────────────────────────────────────────────────
+mysql:
+  inventoryDb:
+    name: inventory_db
+    storageSize: 5Gi
+  loanDb:
+    name: loan_db
+    storageSize: 5Gi
+
+# ── RabbitMQ ─────────────────────────────────────────────────
+rabbitmq:
+  image: rabbitmq:4-management
+  storageSize: 2Gi
+
+# ── Zipkin ───────────────────────────────────────────────────
+zipkin:
+  image: openzipkin/zipkin:latest
+  port: 9411
+
+# ── Secrets (reference only — inject via --set or sealed-secrets) ──
+secrets:
+  jwtSecret: ""             # Required: set via --set secrets.jwtSecret=...
+  mysqlRootPassword: ""
+  inventoryDbUser: ""
+  inventoryDbPass: ""
+  loanDbUser: ""
+  loanDbPass: ""
+  rabbitmqUser: guest
+  rabbitmqPassword: guest

@@ -1,0 +1,140 @@
+# ============================================================
+# CD — Docker Compose Deployment
+# Emergency Equipment Lending Platform (EELP)
+#
+# Triggers: automatically after CI workflow succeeds on main
+#
+# What it does:
+#   1. SSH into deployment server
+#   2. Pull new images (tagged with Git SHA)
+#   3. Restart services with docker compose up -d
+#   4. Poll gateway health — rollback on failure
+#
+# Required GitHub Secrets:
+#   DEPLOY_HOST     — IP or hostname of the target server
+#   DEPLOY_USER     — SSH username (e.g. ubuntu, ec2-user)
+#   DEPLOY_SSH_KEY  — Private SSH key (PEM or OpenSSH format)
+#   DEPLOY_PATH     — Absolute path on server where docker-compose.yml lives
+#                     (e.g. /home/ubuntu/eelp)
+#
+# The server must have Docker + Compose v2 installed and the
+# full .env file in DEPLOY_PATH with production credentials.
+# ============================================================
+
+name: CD — Docker Compose Deploy
+
+on:
+  workflow_run:
+    workflows: ["CI — Build, Test & Publish"]
+    types: [completed]
+    branches: [main]
+
+jobs:
+
+  deploy-compose:
+    name: Deploy via Docker Compose
+    runs-on: ubuntu-latest
+    # Only run if the CI workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Get Git short SHA from triggering commit
+        id: sha
+        run: echo "short=$(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
+
+      - name: Set up SSH agent
+        uses: webfactory/ssh-agent@v0.9.0
+        with:
+          ssh-private-key: ${{ secrets.DEPLOY_SSH_KEY }}
+
+      - name: Add deployment server to known_hosts
+        run: |
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      # Pull new images on the server then recreate containers
+      - name: Pull & restart services
+        env:
+          IMAGE_TAG: ${{ steps.sha.outputs.short }}
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+
+            echo "=== Pulling images with tag: $IMAGE_TAG ==="
+            IMAGE_TAG=$IMAGE_TAG docker compose pull \
+              eureka config-server inventory-service loan-service api-gateway
+
+            echo "=== Restarting services ==="
+            IMAGE_TAG=$IMAGE_TAG docker compose up -d --remove-orphans
+
+            echo "=== Waiting 30s for services to initialise ==="
+            sleep 30
+          ENDSSH
+
+      # ── Health check ──────────────────────────────────────
+      - name: Verify gateway health
+        id: health
+        continue-on-error: true
+        run: |
+          echo "Polling http://${{ secrets.DEPLOY_HOST }}:8080/actuator/health ..."
+          for i in $(seq 1 12); do
+            STATUS=$(ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} \
+              "curl -sf http://localhost:8080/actuator/health | grep -o '\"status\":\"[A-Z]*\"' | head -1" 2>/dev/null || echo "ERROR")
+            echo "Attempt $i: $STATUS"
+            if echo "$STATUS" | grep -q '"status":"UP"'; then
+              echo "health=ok" >> $GITHUB_OUTPUT
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "health=fail" >> $GITHUB_OUTPUT
+          exit 1
+
+      # ── Smoke test (gateway endpoints) ───────────────────
+      - name: Smoke test — public endpoints
+        if: steps.health.outputs.health == 'ok'
+        run: |
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
+            echo "--- /actuator/health ---"
+            curl -sf http://localhost:8080/actuator/health | python3 -m json.tool
+
+            echo "--- /auth/login (should return 400 missing body, not 500) ---"
+            HTTP=$(curl -o /dev/null -sw "%{http_code}" -X POST http://localhost:8080/auth/login \
+              -H "Content-Type: application/json" -d '{}')
+            echo "Status: $HTTP"
+            [[ "$HTTP" == "400" || "$HTTP" == "401" ]] && echo "Auth endpoint reachable ✅" || (echo "Unexpected status ❌" && exit 1)
+          ENDSSH
+
+      # ── Rollback on failure ───────────────────────────────
+      - name: Rollback — restart with :latest (stable) image
+        if: steps.health.outputs.health != 'ok'
+        run: |
+          echo "⚠️  Health check FAILED — rolling back to :latest images"
+          ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} << 'ENDSSH'
+            set -e
+            cd ${{ secrets.DEPLOY_PATH }}
+            docker compose up -d --remove-orphans
+          ENDSSH
+
+      - name: Fail pipeline if rollback was triggered
+        if: steps.health.outputs.health != 'ok'
+        run: |
+          echo "::error::Deployment health check failed. Rolled back to :latest. Investigate logs with: ssh ${{ secrets.DEPLOY_USER }}@${{ secrets.DEPLOY_HOST }} 'docker compose logs --tail=100'"
+          exit 1
+
+      - name: Deployment summary
+        if: steps.health.outputs.health == 'ok'
+        run: |
+          echo "### ✅ Deployment successful" >> $GITHUB_STEP_SUMMARY
+          echo "| | |" >> $GITHUB_STEP_SUMMARY
+          echo "|---|---|" >> $GITHUB_STEP_SUMMARY
+          echo "| **Image tag** | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Host** | \`${{ secrets.DEPLOY_HOST }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Gateway** | http://${{ secrets.DEPLOY_HOST }}:8080 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **Zipkin** | http://${{ secrets.DEPLOY_HOST }}:9411 |" >> $GITHUB_STEP_SUMMARY
+          echo "| **RabbitMQ UI** | http://${{ secrets.DEPLOY_HOST }}:15672 |" >> $GITHUB_STEP_SUMMARY

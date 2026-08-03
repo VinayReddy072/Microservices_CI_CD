@@ -1,0 +1,21 @@
+# ============================================================
+# Eureka Server Service (ADR-004)
+# ClusterIP — services register internally. Dashboard access via port-forward.
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: eureka-server
+  namespace: eelp-production
+  labels:
+    app: eureka-server
+    app.kubernetes.io/part-of: eelp
+spec:
+  type: ClusterIP
+  selector:
+    app: eureka-server
+  ports:
+    - name: eureka
+      protocol: TCP
+      port: 8761
+      targetPort: 8761

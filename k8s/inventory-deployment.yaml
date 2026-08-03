@@ -1,0 +1,91 @@
+# ============================================================
+# Inventory Service — Deployment (ADR-002, ADR-004, ADR-005)
+# - Reads equipment catalogue from inventory_db (ADR-005)
+# - Listens on inventory.loan-events queue (ADR-002)
+# - Registers with Eureka; config pulled from Config Server (ADR-004)
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inventory-service
+  namespace: eelp-production
+  labels:
+    app: inventory-service
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 2   # HA — 2 replicas; RabbitMQ fan-out handles duplicate events idempotently
+  selector:
+    matchLabels:
+      app: inventory-service
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0   # Zero-downtime rolling update
+  template:
+    metadata:
+      labels:
+        app: inventory-service
+    spec:
+      initContainers:
+        - name: wait-for-config-server
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://config-server:8888/actuator/health 2>/dev/null | grep -q UP; do echo waiting for config-server; sleep 5; done']
+        - name: wait-for-rabbitmq
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until nc -z rabbitmq 5672; do echo waiting for rabbitmq; sleep 5; done']
+        - name: wait-for-mysql
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until nc -z mysql-inventory 3306; do echo waiting for mysql; sleep 5; done']
+      containers:
+        - name: inventory-service
+          image: ghcr.io/vinayreddy072/inventory-service:latest
+          ports:
+            - containerPort: 8082
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            - name: INVENTORY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_USER
+            - name: INVENTORY_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_PASS
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_PASSWORD
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8082
+            initialDelaySeconds: 90
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "384Mi"
+              cpu: "250m"
+            limits:
+              memory: "768Mi"
+              cpu: "750m"

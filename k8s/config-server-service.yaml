@@ -1,0 +1,21 @@
+# ============================================================
+# Config Server Service (ADR-004)
+# ClusterIP — domain services call http://config-server:8888 internally.
+# ============================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: config-server
+  namespace: eelp-production
+  labels:
+    app: config-server
+    app.kubernetes.io/part-of: eelp
+spec:
+  type: ClusterIP
+  selector:
+    app: config-server
+  ports:
+    - name: config
+      protocol: TCP
+      port: 8888
+      targetPort: 8888

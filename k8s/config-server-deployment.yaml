@@ -1,0 +1,94 @@
+# ============================================================
+# Config Server — Deployment (ADR-004)
+# Spring Cloud Config Server with native filesystem backend.
+# Serves per-service profile configs from the bundled /config-repo.
+# ============================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: config-server
+  namespace: eelp-production
+  labels:
+    app: config-server
+    app.kubernetes.io/part-of: eelp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: config-server
+  template:
+    metadata:
+      labels:
+        app: config-server
+    spec:
+      # Config Server must start AFTER Eureka is ready
+      initContainers:
+        - name: wait-for-eureka
+          image: busybox:latest
+          command: ['sh', '-c',
+            'until wget -qO- http://eureka-server:8761/actuator/health 2>/dev/null | grep -q UP; do echo waiting for eureka; sleep 5; done']
+      containers:
+        - name: config-server
+          image: ghcr.io/vinayreddy072/config-server:latest
+          ports:
+            - containerPort: 8888
+          envFrom:
+            - configMapRef:
+                name: eelp-config
+          env:
+            # Inject production secrets as env vars that config-repo YAMLs reference
+            - name: INVENTORY_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_USER
+            - name: INVENTORY_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: INVENTORY_DB_PASS
+            - name: LOAN_DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_USER
+            - name: LOAN_DB_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: LOAN_DB_PASS
+            - name: RABBITMQ_USER
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_USER
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: RABBITMQ_PASSWORD
+            - name: JWT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: eelp-secrets
+                  key: JWT_SECRET
+          readinessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 8
+          livenessProbe:
+            httpGet:
+              path: /actuator/health
+              port: 8888
+            initialDelaySeconds: 60
+            periodSeconds: 20
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "250m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

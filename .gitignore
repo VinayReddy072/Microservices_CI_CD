@@ -1,0 +1,42 @@
+
+target/
+**/target/
+
+# IDE 
+.idea/
+*.iml
+.vscode/
+*.swp
+*.swo
+*.DS_Store
+
+# Environment / secrets — real values never committed
+.env
+.env.local
+
+# Logs
+*.log
+logs/
+build-output.txt
+
+# Maven wrapper (keep .mvn directory but not wrapper jar binaries)
+!.mvn/wrapper/maven-wrapper.properties
+.mvn/wrapper/maven-wrapper.jar
+
+# OS 
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# CI/CD — never commit real secret values
+# k8s/secrets.yaml contains placeholder <base64-encoded-*> values only.
+# Real values are injected via Sealed Secrets / External Secrets Operator.
+# If you add a values-prod.yaml with real credentials, exclude it here:
+charts/eelp/values-prod.yaml
+charts/eelp/values-*.local.yaml
+
+# Docker build artefacts
+**/.docker/
+
+# Trivy SARIF reports (generated in CI, not needed in repo)
+trivy-*.sarif

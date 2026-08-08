@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<ruleset name="EELP Loan Service PMD Rules"
+         xmlns="http://pmd.sourceforge.net/ruleset/2.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://pmd.sourceforge.net/ruleset/2.0.0
+                             https://pmd.sourceforge.net/ruleset_2_0_0.xsd">
+    <description>PMD ruleset for EELP Loan Service — error-prone patterns only.</description>
+
+    <rule ref="category/java/errorprone.xml/EmptyCatchBlock"/>
+    <rule ref="category/java/errorprone.xml/UnconditionalIfStatement"/>
+    <rule ref="category/java/errorprone.xml/UnnecessaryConversionTemporary"/>
+    <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
+    <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField">
+        <properties>
+            <property name="ignoredAnnotations"
+                      value="lombok.Getter|lombok.Data|lombok.Builder|lombok.AllArgsConstructor"/>
+        </properties>
+    </rule>
+    <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters"/>
+
+</ruleset>

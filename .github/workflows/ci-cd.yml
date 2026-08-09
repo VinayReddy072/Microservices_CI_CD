@@ -124,7 +124,6 @@ jobs:
           retention-days: 14
 
       - name: SonarCloud analysis (optional — requires SONAR_TOKEN secret)
-        if: ${{ secrets.SONAR_TOKEN != '' }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

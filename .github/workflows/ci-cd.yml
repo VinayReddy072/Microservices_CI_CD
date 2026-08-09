@@ -1,0 +1,221 @@
+name: Loan Service CI/CD
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'services/loan-service/**'
+      - '.github/workflows/ci-cd.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'services/loan-service/**'
+      - '.github/workflows/ci-cd.yml'
+
+env:
+  JAVA_VERSION: '25-ea'
+  IMAGE_NAME: ghcr.io/${{ github.repository_owner }}/loan-service
+
+jobs:
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Compile loan-service
+        run: mvn -B clean compile -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Package loan-service JAR (skip tests)
+        run: mvn -B package -DskipTests -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Upload loan-service JAR artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: loan-service-jar
+          path: services/loan-service/target/loan-service-*.jar
+          retention-days: 7
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: build
+    permissions:
+      checks: write
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Run unit and integration tests
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_CONFIG_IMPORT: ''
+          EUREKA_CLIENT_ENABLED: 'false'
+        run: mvn -B test -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Publish JUnit test report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Loan Service — JUnit Results
+          path: services/loan-service/target/surefire-reports/*.xml
+          reporter: java-junit
+          fail-on-error: true
+
+      - name: Upload Surefire reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: surefire-reports
+          path: services/loan-service/target/surefire-reports/
+          retention-days: 14
+
+  code-quality:
+    name: Code Quality
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: ${{ env.JAVA_VERSION }}
+          cache: maven
+
+      - name: Run Checkstyle
+        run: mvn -B checkstyle:check -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Run PMD
+        run: mvn -B pmd:check -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Generate JaCoCo coverage and enforce 40% threshold
+        env:
+          SPRING_PROFILES_ACTIVE: test
+          SPRING_CONFIG_IMPORT: ''
+          EUREKA_CLIENT_ENABLED: 'false'
+        run: mvn -B verify -f services/loan-service/pom.xml --no-transfer-progress
+
+      - name: Upload JaCoCo coverage report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jacoco-coverage
+          path: services/loan-service/target/site/jacoco/
+          retention-days: 14
+
+      - name: SonarCloud analysis (optional — requires SONAR_TOKEN secret)
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          mvn -B sonar:sonar \
+            -Dsonar.projectKey=VinayReddy072_Microservices_CI_CD \
+            -Dsonar.organization=vinayreddy072 \
+            -Dsonar.host.url=https://sonarcloud.io \
+            -f services/loan-service/pom.xml \
+            --no-transfer-progress || true
+
+  docker-build-push:
+    name: Docker Build & Push
+    runs-on: ubuntu-latest
+    needs: code-quality
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract Docker metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=,format=short
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push loan-service image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: services/loan-service/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=loan-service
+          cache-to: type=gha,mode=max,scope=loan-service
+
+  deploy:
+    name: Deploy (Local Docker)
+    runs-on: ubuntu-latest
+    needs: docker-build-push
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - name: Pull loan-service image from GHCR
+        run: docker pull ${{ env.IMAGE_NAME }}:latest
+
+      - name: Remove existing container (if running)
+        run: docker rm -f eelp-loan-ci 2>/dev/null || true
+
+      - name: Start loan-service container
+        run: |
+          docker run -d \
+            --name eelp-loan-ci \
+            -p 8081:8081 \
+            -e SPRING_PROFILES_ACTIVE=dev \
+            -e SPRING_CONFIG_IMPORT="optional:configserver:" \
+            -e LOAN_DB_URL="${{ secrets.LOAN_DB_URL || 'jdbc:mysql://localhost:3308/loan_db' }}" \
+            -e LOAN_DB_USER="${{ secrets.LOAN_DB_USER || 'loan_user' }}" \
+            -e LOAN_DB_PASS="${{ secrets.LOAN_DB_PASS || 'loan_pass' }}" \
+            -e RABBITMQ_HOST=localhost \
+            -e EUREKA_CLIENT_ENABLED=false \
+            -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \
+            -e EUREKA_CLIENT_FETCH_REGISTRY=false \
+            ${{ env.IMAGE_NAME }}:latest
+
+      - name: Show container status and startup logs
+        run: |
+          sleep 10
+          docker ps -f name=eelp-loan-ci
+          docker logs eelp-loan-ci --tail 40 || true
+
+      - name: Deployment summary
+        run: |
+          echo "Loan service image: ${{ env.IMAGE_NAME }}:latest"
+          echo "Image SHA tag:      ${{ env.IMAGE_NAME }}:$(echo ${{ github.sha }} | cut -c1-7)"
+          echo ""
+          echo "To deploy locally run:"
+          echo "  docker compose up -d mysql-loan rabbitmq loan-service"

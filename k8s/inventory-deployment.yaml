@@ -1,9 +1,7 @@
-# ============================================================
-# Inventory Service — Deployment (ADR-002, ADR-004, ADR-005)
-# - Reads equipment catalogue from inventory_db (ADR-005)
-# - Listens on inventory.loan-events queue (ADR-002)
-# - Registers with Eureka; config pulled from Config Server (ADR-004)
-# ============================================================
+# Inventory Service
+# - Reads equipment catalogue from inventory_db
+# - Listens on inventory.loan-events queue 
+# - Registers with Eureka; config pulled from Config Server
 apiVersion: apps/v1
 kind: Deployment
 metadata:

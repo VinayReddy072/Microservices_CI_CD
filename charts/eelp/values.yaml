@@ -95,11 +95,6 @@ rabbitmq:
   image: rabbitmq:4-management
   storageSize: 2Gi
 
-# ── Zipkin ───────────────────────────────────────────────────
-zipkin:
-  image: openzipkin/zipkin:latest
-  port: 9411
-
 # ── Secrets (reference only — inject via --set or sealed-secrets) ──
 secrets:
   jwtSecret: ""             # Required: set via --set secrets.jwtSecret=...

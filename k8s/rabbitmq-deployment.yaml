@@ -1,8 +1,6 @@
-# ============================================================
-# RabbitMQ — Message Broker (ADR-002: Event-Driven Communication)
+# RabbitMQ
 # Hosts the loan.events TopicExchange with inventory.loan-events queue.
 # loan-service publishes → inventory-service consumes.
-# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

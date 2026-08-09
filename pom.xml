@@ -164,27 +164,20 @@
                     </configuration>
                 </plugin>
 
-                <!-- JaCoCo: generate coverage report + enforce threshold in CI.
-                     Bound to test/verify phases. Run: mvn verify
-                     Ratchet: raise minimum.ratio as tests are added. -->
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
                     <version>0.8.12</version>
                     <executions>
-                        <!-- Instrument classes before tests run -->
                         <execution>
                             <id>jacoco-prepare-agent</id>
                             <goals><goal>prepare-agent</goal></goals>
                         </execution>
-                        <!-- Generate XML + HTML report after tests -->
                         <execution>
                             <id>jacoco-report</id>
                             <phase>verify</phase>
                             <goals><goal>report</goal></goals>
                         </execution>
-                        <!-- Enforce minimum coverage threshold.
-                             Start at 0% (no tests yet); raise to 0.70 progressively. -->
                         <execution>
                             <id>jacoco-check</id>
                             <phase>verify</phase>
@@ -197,7 +190,6 @@
                                             <limit>
                                                 <counter>LINE</counter>
                                                 <value>COVEREDRATIO</value>
-                                                <!-- Ratchet: 0.0 → 0.50 → 0.70 → 0.80 -->
                                                 <minimum>0.0</minimum>
                                             </limit>
                                         </limits>

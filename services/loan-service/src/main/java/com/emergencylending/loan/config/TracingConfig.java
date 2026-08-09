@@ -9,11 +9,11 @@ import io.opentelemetry.api.common.AttributeKey;
 import io.opentelemetry.api.common.Attributes;
 import io.opentelemetry.api.trace.propagation.W3CTraceContextPropagator;
 import io.opentelemetry.context.propagation.ContextPropagators;
-import io.opentelemetry.exporter.zipkin.ZipkinSpanExporter;
+
 import io.opentelemetry.sdk.OpenTelemetrySdk;
 import io.opentelemetry.sdk.resources.Resource;
 import io.opentelemetry.sdk.trace.SdkTracerProvider;
-import io.opentelemetry.sdk.trace.export.BatchSpanProcessor;
+
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,22 +28,15 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class TracingConfig {
 
-    @SuppressWarnings("deprecation") // ZipkinSpanExporter deprecated in OTel 1.x; still functional for Zipkin v2
     @Bean
     public OpenTelemetry openTelemetry(
-            @Value("${spring.application.name}") String serviceName,
-            @Value("${management.zipkin.tracing.endpoint:http://localhost:9411/api/v2/spans}") String zipkinEndpoint) {
-
-        ZipkinSpanExporter exporter = ZipkinSpanExporter.builder()
-                .setEndpoint(zipkinEndpoint)
-                .build();
+            @Value("${spring.application.name}") String serviceName) {
 
         Resource resource = Resource.create(
                 Attributes.of(AttributeKey.stringKey("service.name"), serviceName));
 
         SdkTracerProvider tracerProvider = SdkTracerProvider.builder()
                 .setResource(resource)
-                .addSpanProcessor(BatchSpanProcessor.builder(exporter).build())
                 .build();
 
         // Flush pending spans on graceful shutdown.

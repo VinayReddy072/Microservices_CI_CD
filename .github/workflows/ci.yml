@@ -1,22 +1,4 @@
-# ============================================================
-# CI — Build, Test, Dockerize, Push
-# Emergency Equipment Lending Platform (EELP)
-#
-# Triggers: push to main, pull_request targeting main
-#
-# Jobs:
-#   1. build-and-test  — compile + test all modules with service containers
-#   2. docker-build-push — build & push 5 images to GHCR (main only)
-#   3. trivy-scan      — vulnerability scan pushed images (main only)
-#
-# Required GitHub Secrets:
-#   GHCR_TOKEN    — GitHub PAT with packages:write (or use GITHUB_TOKEN)
-#
-# Optional GitHub Secrets (quality gates):
-#   SONAR_TOKEN   — SonarCloud token (step is skipped if absent)
-# ============================================================
-
-name: CI — Build, Test & Publish
+name: CI
 
 on:
   push:
@@ -28,16 +10,14 @@ env:
   REGISTRY: ghcr.io
   IMAGE_PREFIX: ghcr.io/${{ github.repository_owner }}
   JAVA_VERSION: '25-ea'
-  MAVEN_OPTS: '-Xmx2g -XX:+TieredCompilation'
+  MAVEN_OPTS: '-Xmx2g'
 
 jobs:
 
-  # ── Job 1: Compile + Test ──────────────────────────────────
   build-and-test:
-    name: Build & Test (Java ${{ env.JAVA_VERSION }})
+    name: Build & Test
     runs-on: ubuntu-latest
 
-    # Service containers for MySQL (ADR-005) and RabbitMQ (ADR-002)
     services:
       mysql-inventory:
         image: mysql:8.4
@@ -86,24 +66,21 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK ${{ env.JAVA_VERSION }} (Temurin EA)
+      - name: Set up JDK ${{ env.JAVA_VERSION }}
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: ${{ env.JAVA_VERSION }}
           cache: maven
 
-      # ── Inventory Service Tests ────────────────────────────
       - name: Test — inventory-service
         env:
-          # Inject real DB URL pointing to service container (ADR-005)
           INVENTORY_DB_URL: jdbc:mysql://localhost:3307/inventory_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
           INVENTORY_DB_USER: inventory_user
           INVENTORY_DB_PASS: inventory_pass
           RABBITMQ_HOST: localhost
           RABBITMQ_USER: guest
           RABBITMQ_PASSWORD: guest
-          # Point Config Import to optional so tests don't block on missing config-server
           SPRING_CONFIG_IMPORT: "optional:configserver:"
           SPRING_PROFILES_ACTIVE: dev
         run: |
@@ -111,35 +88,26 @@ jobs:
             -f services/inventory-service/pom.xml \
             --no-transfer-progress
 
-      # ── Loan Service Tests ─────────────────────────────────
       - name: Test — loan-service
         env:
           LOAN_DB_URL: jdbc:mysql://localhost:3308/loan_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
           LOAN_DB_USER: loan_user
           LOAN_DB_PASS: loan_pass
-          INVENTORY_DB_URL: jdbc:mysql://localhost:3307/inventory_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
           RABBITMQ_HOST: localhost
           RABBITMQ_USER: guest
           RABBITMQ_PASSWORD: guest
           SPRING_CONFIG_IMPORT: "optional:configserver:"
           SPRING_PROFILES_ACTIVE: dev
-          # JWT_SECRET required by api-gateway but not loan-service; included for env completeness
-          JWT_SECRET: ci-test-secret-not-used-in-loan-service
         run: |
           mvn -B test \
             -f services/loan-service/pom.xml \
             --no-transfer-progress
 
-      # ── Coverage Report (JaCoCo) ───────────────────────────
       - name: Generate JaCoCo coverage reports
         if: always()
         run: |
-          mvn -B verify -DskipTests \
-            -f services/inventory-service/pom.xml \
-            --no-transfer-progress || true
-          mvn -B verify -DskipTests \
-            -f services/loan-service/pom.xml \
-            --no-transfer-progress || true
+          mvn -B verify -DskipTests -f services/inventory-service/pom.xml --no-transfer-progress || true
+          mvn -B verify -DskipTests -f services/loan-service/pom.xml --no-transfer-progress || true
 
       - name: Upload Surefire test reports
         if: always()
@@ -161,7 +129,6 @@ jobs:
             services/loan-service/target/site/jacoco/
           retention-days: 14
 
-      # ── Optional: SonarCloud scan ──────────────────────────
       - name: SonarCloud analysis
         if: env.SONAR_TOKEN != ''
         env:
@@ -175,7 +142,6 @@ jobs:
             -Dsonar.login=$SONAR_TOKEN \
             --no-transfer-progress || true
 
-  # ── Job 2: Build & Push Docker images (main only) ─────────
   docker-build-push:
     name: Build & Push Docker Images
     runs-on: ubuntu-latest
@@ -184,26 +150,21 @@ jobs:
 
     permissions:
       contents: read
-      packages: write   # Required to push to GHCR
+      packages: write
 
     strategy:
       matrix:
         include:
           - service: inventory-service
             dockerfile: services/inventory-service/Dockerfile
-            port: 8082
           - service: loan-service
             dockerfile: services/loan-service/Dockerfile
-            port: 8081
           - service: api-gateway
             dockerfile: platform/api-gateway/Dockerfile
-            port: 8080
           - service: config-server
             dockerfile: platform/config-server/Dockerfile
-            port: 8888
           - service: eureka-server
             dockerfile: platform/eureka-server/Dockerfile
-            port: 8761
 
     steps:
       - name: Checkout repository
@@ -217,7 +178,6 @@ jobs:
         with:
           registry: ${{ env.REGISTRY }}
           username: ${{ github.actor }}
-          # Use GHCR_TOKEN secret or fall back to GITHUB_TOKEN
           password: ${{ secrets.GHCR_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Extract Docker metadata
@@ -228,7 +188,6 @@ jobs:
           tags: |
             type=sha,prefix=,format=short
             type=raw,value=latest,enable={{is_default_branch}}
-            type=ref,event=branch
 
       - name: Build and push ${{ matrix.service }}
         uses: docker/build-push-action@v6
@@ -241,19 +200,15 @@ jobs:
           cache-from: type=gha,scope=${{ matrix.service }}
           cache-to: type=gha,mode=max,scope=${{ matrix.service }}
 
-      - name: Output pushed image digest
-        run: echo "Pushed ${{ matrix.service }} → ${{ steps.meta.outputs.tags }}"
-
-  # ── Job 3: Trivy vulnerability scan ───────────────────────
   trivy-scan:
-    name: Trivy Image Scan — ${{ matrix.service }}
+    name: Trivy Scan — ${{ matrix.service }}
     runs-on: ubuntu-latest
     needs: docker-build-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     permissions:
       contents: read
-      security-events: write   # Upload SARIF to GitHub Security tab
+      security-events: write
 
     strategy:
       matrix:
@@ -269,14 +224,14 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Run Trivy vulnerability scan
-        uses: aquasecurity/trivy-action@0.28.0
+        uses: aquasecurity/trivy-action@master
         with:
           image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.service }}:latest
           format: sarif
           output: trivy-${{ matrix.service }}.sarif
           severity: CRITICAL,HIGH
-          exit-code: '1'       # Fail pipeline on CRITICAL/HIGH findings
-          ignore-unfixed: true # Skip vulnerabilities with no fix yet
+          exit-code: '1'
+          ignore-unfixed: true
 
       - name: Upload Trivy SARIF to GitHub Security
         if: always()

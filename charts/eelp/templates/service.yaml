@@ -1,9 +1,3 @@
-{{/*
-  ============================================================
-  Services template — renders Kubernetes Service for each enabled service.
-  ============================================================
-*/}}
-
 {{- if .Values.eureka.enabled }}
 ---
 apiVersion: v1

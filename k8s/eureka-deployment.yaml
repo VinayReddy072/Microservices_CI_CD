@@ -1,8 +1,6 @@
-# ============================================================
-# Eureka Server — Service Registry (ADR-004)
+# Eureka Server — Service Registry
 # All 5 Spring Boot processes register here on startup.
 # API Gateway and Loan Service resolve lb:// URIs via this registry.
-# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

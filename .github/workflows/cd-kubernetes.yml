@@ -1,28 +1,8 @@
-# ============================================================
-# CD — Kubernetes Deployment
-# Emergency Equipment Lending Platform (EELP)
-#
-# Triggers: automatically after CI workflow succeeds on main
-#
-# What it does:
-#   1. Patches k8s/ Deployment manifests with the new image SHA tag
-#   2. Applies all manifests with kubectl apply
-#   3. Waits for rollout to complete on all services
-#   4. Runs a smoke-test against the gateway
-#   5. Rolls back on failure via kubectl rollout undo
-#
-# Required GitHub Secrets:
-#   KUBE_CONFIG_DATA — base64-encoded kubeconfig
-#                      Generate: cat ~/.kube/config | base64 -w 0
-#
-# Namespace: eelp-production (created by k8s/namespace.yaml)
-# ============================================================
-
 name: CD — Kubernetes Deploy
 
 on:
   workflow_run:
-    workflows: ["CI — Build, Test & Publish"]
+    workflows: ["CI"]
     types: [completed]
     branches: [main]
 
@@ -42,7 +22,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Get Git short SHA from triggering commit
+      - name: Get Git short SHA
         id: sha
         run: echo "short=$(echo '${{ github.event.workflow_run.head_sha }}' | cut -c1-7)" >> $GITHUB_OUTPUT
 
@@ -57,49 +37,38 @@ jobs:
           echo "${{ secrets.KUBE_CONFIG_DATA }}" | base64 -d > ~/.kube/config
           chmod 600 ~/.kube/config
 
-      # ── Patch image tags in manifests ────────────────────
-      - name: Patch Deployment manifests with new image SHA
+      - name: Patch image tags in manifests
         env:
           IMAGE_TAG: ${{ steps.sha.outputs.short }}
         run: |
-          SERVICES=(inventory-service loan-service api-gateway config-server eureka-server)
-          for svc in "${SERVICES[@]}"; do
-            MANIFEST="k8s/${svc//-deployment/}-deployment.yaml"
-            # Replace :latest or :any-tag with the new SHA tag
+          for svc in inventory-service loan-service api-gateway config-server eureka-server; do
             sed -i "s|image: ${IMAGE_PREFIX}/${svc}:.*|image: ${IMAGE_PREFIX}/${svc}:${IMAGE_TAG}|g" \
               "k8s/${svc}-deployment.yaml" 2>/dev/null || true
           done
-          echo "Patched manifests:"
-          grep -r "image:" k8s/ | grep "$IMAGE_PREFIX" || true
 
-      # ── Apply all manifests ───────────────────────────────
-      - name: Apply Kubernetes namespace
+      - name: Apply namespace
         run: kubectl apply -f k8s/namespace.yaml
 
-      - name: Apply ConfigMap and Secrets template
+      - name: Apply ConfigMap and Secrets
         run: |
           kubectl apply -f k8s/configmap.yaml -n ${{ env.NAMESPACE }}
-          # Note: k8s/secrets.yaml contains placeholder values — real secrets
-          # should be injected via sealed-secrets or external-secrets operator
           kubectl apply -f k8s/secrets.yaml -n ${{ env.NAMESPACE }} || true
 
-      - name: Apply infrastructure services (MySQL, RabbitMQ, Zipkin)
+      - name: Apply infrastructure services
         run: |
           kubectl apply -f k8s/mysql-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/mysql-service.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/rabbitmq-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/rabbitmq-service.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f k8s/zipkin-deployment.yaml -n ${{ env.NAMESPACE }}
-          kubectl apply -f k8s/zipkin-service.yaml -n ${{ env.NAMESPACE }}
 
-      - name: Apply platform services (Eureka, Config Server)
+      - name: Apply platform services
         run: |
           kubectl apply -f k8s/eureka-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/eureka-service.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/config-server-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/config-server-service.yaml -n ${{ env.NAMESPACE }}
 
-      - name: Apply domain services (Inventory, Loan, Gateway)
+      - name: Apply domain services
         run: |
           kubectl apply -f k8s/inventory-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/inventory-service.yaml -n ${{ env.NAMESPACE }}
@@ -108,7 +77,6 @@ jobs:
           kubectl apply -f k8s/gateway-deployment.yaml -n ${{ env.NAMESPACE }}
           kubectl apply -f k8s/gateway-service.yaml -n ${{ env.NAMESPACE }}
 
-      # ── Wait for rollout completion ───────────────────────
       - name: Wait — Eureka rollout
         run: kubectl rollout status deployment/eureka-server -n ${{ env.NAMESPACE }} --timeout=180s
 
@@ -116,23 +84,18 @@ jobs:
         run: kubectl rollout status deployment/config-server -n ${{ env.NAMESPACE }} --timeout=180s
 
       - name: Wait — Inventory Service rollout
-        id: rollout-inventory
         run: kubectl rollout status deployment/inventory-service -n ${{ env.NAMESPACE }} --timeout=300s
 
       - name: Wait — Loan Service rollout
-        id: rollout-loan
         run: kubectl rollout status deployment/loan-service -n ${{ env.NAMESPACE }} --timeout=300s
 
       - name: Wait — API Gateway rollout
-        id: rollout-gateway
         run: kubectl rollout status deployment/api-gateway -n ${{ env.NAMESPACE }} --timeout=300s
 
-      # ── Smoke test ───────────────────────────────────────
-      - name: Smoke test — gateway health via kubectl port-forward
+      - name: Smoke test via port-forward
         id: smoke
         continue-on-error: true
         run: |
-          # Port-forward the gateway service for smoke testing
           kubectl port-forward svc/api-gateway 8080:8080 -n ${{ env.NAMESPACE }} &
           PF_PID=$!
           sleep 5
@@ -153,23 +116,19 @@ jobs:
           echo "smoke=fail" >> $GITHUB_OUTPUT
           exit 1
 
-      # ── Rollback on failure ───────────────────────────────
       - name: Rollback on smoke test failure
         if: steps.smoke.outputs.smoke != 'ok'
         run: |
-          echo "⚠️  Smoke test failed — initiating rollback"
           kubectl rollout undo deployment/api-gateway -n ${{ env.NAMESPACE }} || true
           kubectl rollout undo deployment/loan-service -n ${{ env.NAMESPACE }} || true
           kubectl rollout undo deployment/inventory-service -n ${{ env.NAMESPACE }} || true
           kubectl rollout undo deployment/config-server -n ${{ env.NAMESPACE }} || true
           kubectl rollout undo deployment/eureka-server -n ${{ env.NAMESPACE }} || true
-          echo "Rollback complete. Previous ReplicaSets restored."
 
       - name: Fail pipeline if rollback triggered
         if: steps.smoke.outputs.smoke != 'ok'
         run: exit 1
 
-      # ── Deployment summary ────────────────────────────────
       - name: Pod status after deployment
         if: always()
         run: kubectl get pods -n ${{ env.NAMESPACE }} -o wide
@@ -177,13 +136,11 @@ jobs:
       - name: Deployment summary
         if: steps.smoke.outputs.smoke == 'ok'
         run: |
-          echo "### ✅ Kubernetes Deployment Successful" >> $GITHUB_STEP_SUMMARY
+          echo "### Kubernetes Deployment Successful" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| Service | Image Tag |" >> $GITHUB_STEP_SUMMARY
           echo "|---------|-----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| inventory-service | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| loan-service | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| api-gateway | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| config-server | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| eureka-server | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
+          for svc in inventory-service loan-service api-gateway config-server eureka-server; do
+            echo "| ${svc} | \`${{ steps.sha.outputs.short }}\` |" >> $GITHUB_STEP_SUMMARY
+          done
           kubectl get deployments -n ${{ env.NAMESPACE }} >> $GITHUB_STEP_SUMMARY

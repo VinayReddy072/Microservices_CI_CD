@@ -1,9 +1,7 @@
-# ============================================================
-# Services for MySQL databases (ADR-005)
+# Services for MySQL databases
 # ClusterIP services — internal-only, no external exposure.
-# ============================================================
 
-# ── Inventory DB service ──────────────────────────────────────
+# ── Inventory DB service
 apiVersion: v1
 kind: Service
 metadata:
@@ -23,7 +21,7 @@ spec:
       targetPort: 3306
 
 ---
-# ── Loan DB deployment ────────────────────────────────────────
+# ── Loan DB deployment
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -104,7 +102,7 @@ spec:
     requests:
       storage: 5Gi
 ---
-# ── Loan DB service ───────────────────────────────────────────
+# ── Loan DB service
 apiVersion: v1
 kind: Service
 metadata:

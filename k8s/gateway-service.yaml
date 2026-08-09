@@ -1,9 +1,7 @@
-# ============================================================
-# API Gateway — Service (ADR-001)
+# API Gateway
 # LoadBalancer type — the ONLY externally exposed service.
 # All external client traffic enters here (ADR-001 gateway-centred security).
 # Domain services (8081, 8082) are ClusterIP only.
-# ============================================================
 apiVersion: v1
 kind: Service
 metadata:

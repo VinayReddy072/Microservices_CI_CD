@@ -1,29 +1,4 @@
-# ============================================================
-# Emergency Equipment Lending Platform — Docker Compose
-#
-# Architecture (ADR-001 through ADR-005):
-#   Infrastructure:  mysql-inventory, mysql-loan, rabbitmq, zipkin
-#   Platform layer:  eureka, config-server
-#   Domain services: inventory-service, loan-service, api-gateway
-#
-# Usage:
-#   cp .env.example .env && nano .env   # fill real credentials
-#   docker compose up -d
-#   docker compose logs -f api-gateway
-#
-# Image tags: override with IMAGE_TAG env var (default: latest)
-#   IMAGE_TAG=abc1234 docker compose up -d
-# ============================================================
-
-x-healthcheck-defaults: &healthcheck-defaults
-  interval: 15s
-  timeout: 5s
-  retries: 10
-  start_period: 40s
-
 services:
-
-  # ── Infrastructure ────────────────────────────────────────
 
   mysql-inventory:
     image: mysql:8.4
@@ -39,8 +14,11 @@ services:
     volumes:
       - mysql-inventory-data:/var/lib/mysql
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
@@ -58,8 +36,11 @@ services:
     volumes:
       - mysql-loan-data:/var/lib/mysql
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD:-rootpass}"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
@@ -72,28 +53,17 @@ services:
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-guest}
     ports:
       - "5672:5672"
-      - "15672:15672"   # Management UI
+      - "15672:15672"
     volumes:
       - rabbitmq-data:/var/lib/rabbitmq
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
-
-  zipkin:
-    image: openzipkin/zipkin:latest
-    container_name: eelp-zipkin
-    restart: unless-stopped
-    ports:
-      - "9411:9411"
-    healthcheck:
-      <<: *healthcheck-defaults
-      test: ["CMD-SHELL", "wget -qO- http://localhost:9411/health || exit 1"]
-    networks:
-      - eelp-network
-
-  # ── Platform Layer (must start before domain services) ───
 
   eureka:
     image: ${DOCKER_REGISTRY:-ghcr.io/vinayreddy072}/eureka-server:${IMAGE_TAG:-latest}
@@ -105,8 +75,11 @@ services:
     ports:
       - "8761:8761"
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -qO- http://localhost:8761/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
@@ -119,7 +92,6 @@ services:
     restart: unless-stopped
     environment:
       CONFIG_REPO_PATH: file:///config-repo
-      # Eureka URL override for Docker networking (ADR-004)
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:8761/eureka/
     ports:
       - "8888:8888"
@@ -127,12 +99,13 @@ services:
       eureka:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -qO- http://localhost:8888/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
-
-  # ── Domain Microservices ──────────────────────────────────
 
   inventory-service:
     image: ${DOCKER_REGISTRY:-ghcr.io/vinayreddy072}/inventory-service:${IMAGE_TAG:-latest}
@@ -142,21 +115,15 @@ services:
       dockerfile: services/inventory-service/Dockerfile
     restart: unless-stopped
     environment:
-      # Spring profile — pulls inventory-service-production.yml from Config Server (ADR-004)
       SPRING_PROFILES_ACTIVE: production
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-      # DB credentials (ADR-005 — separate schema/user per service)
       INVENTORY_DB_URL: jdbc:mysql://mysql-inventory:3306/inventory_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       INVENTORY_DB_USER: ${INVENTORY_DB_USER:-inventory_user}
       INVENTORY_DB_PASS: ${INVENTORY_DB_PASS:-inventory_pass}
-      # RabbitMQ (ADR-002 — async event consumer)
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      # Eureka registration (ADR-004)
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:8761/eureka/
-      # Zipkin tracing endpoint
-      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8082:8082"
     depends_on:
@@ -167,8 +134,11 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -qO- http://localhost:8082/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
@@ -182,18 +152,13 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: production
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-      # DB credentials (ADR-005)
       LOAN_DB_URL: jdbc:mysql://mysql-loan:3306/loan_db?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
       LOAN_DB_USER: ${LOAN_DB_USER:-loan_user}
       LOAN_DB_PASS: ${LOAN_DB_PASS:-loan_pass}
-      # RabbitMQ (ADR-002 — async event publisher)
       RABBITMQ_HOST: rabbitmq
       RABBITMQ_USER: ${RABBITMQ_USER:-guest}
       RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:-guest}
-      # Eureka (ADR-004)
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:8761/eureka/
-      # Zipkin
-      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8081:8081"
     depends_on:
@@ -206,8 +171,11 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -qO- http://localhost:8081/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
@@ -221,12 +189,8 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: production
       SPRING_CONFIG_IMPORT: "optional:configserver:http://config-server:8888"
-      # JWT secret (ADR-001 — HMAC-SHA256, must be set; gateway refuses to start if absent)
       JWT_SECRET: ${JWT_SECRET}
-      # Eureka (ADR-004 — resolves lb://loan-service and lb://inventory-service)
       EUREKA_CLIENT_SERVICEURL_DEFAULTZONE: http://eureka:8761/eureka/
-      # Zipkin
-      MANAGEMENT_ZIPKIN_TRACING_ENDPOINT: http://zipkin:9411/api/v2/spans
     ports:
       - "8080:8080"
     depends_on:
@@ -237,18 +201,19 @@ services:
       config-server:
         condition: service_healthy
     healthcheck:
-      <<: *healthcheck-defaults
       test: ["CMD-SHELL", "wget -qO- http://localhost:8080/actuator/health | grep -q UP || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
     networks:
       - eelp-network
 
-# ── Volumes ──────────────────────────────────────────────────
 volumes:
   mysql-inventory-data:
   mysql-loan-data:
   rabbitmq-data:
 
-# ── Network ──────────────────────────────────────────────────
 networks:
   eelp-network:
     driver: bridge

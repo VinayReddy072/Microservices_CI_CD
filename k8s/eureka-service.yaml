@@ -1,7 +1,5 @@
-# ============================================================
-# Eureka Server Service (ADR-004)
+# Eureka Server Service
 # ClusterIP — services register internally. Dashboard access via port-forward.
-# ============================================================
 apiVersion: v1
 kind: Service
 metadata:

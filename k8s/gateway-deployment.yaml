@@ -1,9 +1,7 @@
-# ============================================================
-# API Gateway — Deployment (ADR-001, ADR-004)
+# API Gateway
 # Single external entry point. Enforces JWT auth + RBAC.
 # Routes /api/loans/** → lb://loan-service
 #         /api/equipment/** → lb://inventory-service
-# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,7 +1,5 @@
-# ============================================================
-# Loan Service — Service (ADR-004)
+# Loan Service
 # ClusterIP — internal only. API Gateway resolves via lb://loan-service.
-# ============================================================
 apiVersion: v1
 kind: Service
 metadata:

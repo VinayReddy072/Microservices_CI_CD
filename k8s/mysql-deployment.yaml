@@ -1,8 +1,6 @@
-# ============================================================
-# MySQL — Inventory Database (ADR-005: Database-per-Service)
+# MySQL — Inventory Database
 # Separate MySQL instance for inventory_db.
 # inventory_user has GRANT ALL on inventory_db only — no access to loan_db.
-# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,10 +1,3 @@
-# ============================================================
-# Loan Service — Multi-Stage Dockerfile
-# Stage 1: Build with Maven + JDK 25 (Eclipse Temurin)
-# Stage 2: Run with minimal JRE 25
-# ============================================================
-
-# ── Stage 1: Build ───────────────────────────────────────────
 FROM eclipse-temurin:25-jdk AS builder
 
 ARG MAVEN_VERSION=3.9.9
@@ -30,7 +23,6 @@ RUN mvn -B clean package -DskipTests \
     -f services/loan-service/pom.xml \
     -Dmaven.repo.local=/root/.m2
 
-# ── Stage 2: Runtime ─────────────────────────────────────────
 FROM eclipse-temurin:25-jre AS runtime
 
 RUN groupadd -r eelp && useradd -r -g eelp eelp
@@ -43,7 +35,6 @@ RUN chown eelp:eelp loan-service.jar
 
 USER eelp
 
-# Port 8081 per ADR-004 service registry
 EXPOSE 8081
 
 ENTRYPOINT ["java", \

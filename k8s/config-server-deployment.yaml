@@ -1,8 +1,6 @@
-# ============================================================
-# Config Server — Deployment (ADR-004)
+# Config Server
 # Spring Cloud Config Server with native filesystem backend.
 # Serves per-service profile configs from the bundled /config-repo.
-# ============================================================
 apiVersion: apps/v1
 kind: Deployment
 metadata:

@@ -1,7 +1,5 @@
-# ============================================================
-# Config Server Service (ADR-004)
+# Config Server Service
 # ClusterIP — domain services call http://config-server:8888 internally.
-# ============================================================
 apiVersion: v1
 kind: Service
 metadata:

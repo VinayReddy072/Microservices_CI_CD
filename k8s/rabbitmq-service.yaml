@@ -1,8 +1,6 @@
-# ============================================================
-# RabbitMQ Service (ADR-002)
+# RabbitMQ Service
 # ClusterIP for AMQP port (5672) — domain services connect internally.
 # Optional: expose Management UI (15672) via NodePort for debugging.
-# ============================================================
 apiVersion: v1
 kind: Service
 metadata:

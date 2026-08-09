@@ -1,8 +1,6 @@
-# ============================================================
-# Inventory Service — Service (ADR-004)
+# Inventory Service
 # ClusterIP — internal only. Loan Service reaches it via Eureka lb://inventory-service.
-# ADR-001: Domain service ports are NOT externally exposed.
-# ============================================================
+# Domain service ports are NOT externally exposed.
 apiVersion: v1
 kind: Service
 metadata:

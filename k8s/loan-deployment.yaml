@@ -1,10 +1,8 @@
-# ============================================================
-# Loan Service — Deployment (ADR-002, ADR-003, ADR-004, ADR-005)
-# - Manages loan lifecycle in loan_db (ADR-005)
+# Loan Service
+# - Manages loan lifecycle in loan_db
 # - Calls inventory-service via Feign (synchronous availability check)
-# - Publishes loan.approved / loan.returned events to RabbitMQ (ADR-002)
-# - Resilience4J: retry, circuit breaker, rate limiter, bulkhead (ADR-003)
-# ============================================================
+# - Publishes loan.approved / loan.returned events to RabbitMQ
+# - Resilience4J: retry, circuit breaker, rate limiter, bulkhead
 apiVersion: apps/v1
 kind: Deployment
 metadata:

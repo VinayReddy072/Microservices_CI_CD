@@ -37,8 +37,7 @@ class LoanRequestRepositoryTest {
 
         LoanRequest saved = repository.save(loan);
 
-        // INTENTIONAL FAILURE: changed isNotNull() to isNull() to break the pipeline
-        assertThat(saved.getId()).isNull();
+        assertThat(saved.getId()).isNotNull().isPositive();
         assertThat(saved.getStatus()).isEqualTo(LoanStatus.PENDING);
         assertThat(saved.getRequestedAt()).isNotNull();
     }

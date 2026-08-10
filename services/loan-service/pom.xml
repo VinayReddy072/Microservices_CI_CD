@@ -115,6 +115,9 @@
             <plugin>
                 <groupId>org.jacoco</groupId>
                 <artifactId>jacoco-maven-plugin</artifactId>
+                <!-- 0.8.12 (Spring Boot 4.1.0 BOM) does not support Java 25 class files (major version 69).
+                     0.8.13 adds Java 25 support — explicitly override the BOM version here. -->
+                <version>0.8.13</version>
                 <executions>
                     <execution>
                         <id>jacoco-check</id>

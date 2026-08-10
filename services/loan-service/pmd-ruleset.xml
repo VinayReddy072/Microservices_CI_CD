@@ -11,12 +11,9 @@
     <rule ref="category/java/errorprone.xml/UnnecessaryConversionTemporary"/>
     <rule ref="category/java/errorprone.xml/ReturnFromFinallyBlock"/>
     <rule ref="category/java/bestpractices.xml/UnusedLocalVariable"/>
-    <rule ref="category/java/bestpractices.xml/UnusedPrivateField">
-        <properties>
-            <property name="ignoredAnnotations"
-                      value="lombok.Getter|lombok.Data|lombok.Builder|lombok.AllArgsConstructor"/>
-        </properties>
-    </rule>
+    <!-- PMD 7.x dropped the 'ignoredAnnotations' property from UnusedPrivateField.
+         Lombok-annotated fields are already handled correctly without explicit config. -->
+    <rule ref="category/java/bestpractices.xml/UnusedPrivateField"/>
     <rule ref="category/java/bestpractices.xml/AvoidReassigningParameters"/>
 
 </ruleset>

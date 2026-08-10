@@ -182,6 +182,10 @@ jobs:
     runs-on: ubuntu-latest
     needs: docker-build-push
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      LOAN_DB_URL: ${{ secrets.LOAN_DB_URL != '' && secrets.LOAN_DB_URL || 'jdbc:mysql://localhost:3308/loan_db' }}
+      LOAN_DB_USER: ${{ secrets.LOAN_DB_USER != '' && secrets.LOAN_DB_USER || 'loan_user' }}
+      LOAN_DB_PASS: ${{ secrets.LOAN_DB_PASS != '' && secrets.LOAN_DB_PASS || 'loan_pass' }}
     steps:
       - name: Pull loan-service image from GHCR
         run: docker pull ${{ env.IMAGE_NAME }}:latest
@@ -196,9 +200,9 @@ jobs:
             -p 8081:8081 \
             -e SPRING_PROFILES_ACTIVE=dev \
             -e SPRING_CONFIG_IMPORT="optional:configserver:" \
-            -e LOAN_DB_URL="${{ secrets.LOAN_DB_URL || 'jdbc:mysql://localhost:3308/loan_db' }}" \
-            -e LOAN_DB_USER="${{ secrets.LOAN_DB_USER || 'loan_user' }}" \
-            -e LOAN_DB_PASS="${{ secrets.LOAN_DB_PASS || 'loan_pass' }}" \
+            -e LOAN_DB_URL="$LOAN_DB_URL" \
+            -e LOAN_DB_USER="$LOAN_DB_USER" \
+            -e LOAN_DB_PASS="$LOAN_DB_PASS" \
             -e RABBITMQ_HOST=localhost \
             -e EUREKA_CLIENT_ENABLED=false \
             -e EUREKA_CLIENT_REGISTER_WITH_EUREKA=false \

@@ -1,16 +1,16 @@
 package com.emergencylending.loan.repository;
 
-import com.emergencylending.loan.entity.LoanRequest;
-import com.emergencylending.loan.entity.LoanStatus;
+import java.util.Optional;
+
+import static org.assertj.core.api.Assertions.assertThat;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.test.context.ActiveProfiles;
 
-import java.util.Optional;
-
-import static org.assertj.core.api.Assertions.assertThat;
+import com.emergencylending.loan.entity.LoanRequest;
+import com.emergencylending.loan.entity.LoanStatus;
 
 /**
  * Integration test for {@link LoanRequestRepository}.
@@ -37,7 +37,8 @@ class LoanRequestRepositoryTest {
 
         LoanRequest saved = repository.save(loan);
 
-        assertThat(saved.getId()).isNotNull().isPositive();
+        // INTENTIONAL FAILURE: changed isNotNull() to isNull() to break the pipeline
+        assertThat(saved.getId()).isNull();
         assertThat(saved.getStatus()).isEqualTo(LoanStatus.PENDING);
         assertThat(saved.getRequestedAt()).isNotNull();
     }

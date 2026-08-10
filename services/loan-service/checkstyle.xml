@@ -10,16 +10,19 @@
         <property name="eachLine" value="true"/>
     </module>
 
+    <module name="LineLength">
+        <property name="max" value="150"/>
+    </module>
+
     <module name="TreeWalker">
 
         <module name="UnusedImports"/>
 
-        <module name="LineLength">
-            <property name="max" value="150"/>
-        </module>
-
         <module name="TypeName"/>
-        <module name="ConstantName"/>
+        <module name="ConstantName">
+            <!-- Allow typical SLF4J logger names (log, logger) alongside standard UPPER_SNAKE_CASE -->
+            <property name="format" value="^([A-Z][A-Z0-9]*(_[A-Z0-9]+)*|log|logger)$"/>
+        </module>
         <module name="MemberName"/>
         <module name="MethodName"/>
         <module name="LocalVariableName"/>

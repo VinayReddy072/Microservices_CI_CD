@@ -8,7 +8,7 @@ FROM eclipse-temurin:25-jdk AS builder
 
 ARG MAVEN_VERSION=3.9.9
 RUN apt-get update && apt-get install -y wget \
-    && wget -q "https://downloads.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -O /tmp/maven.tar.gz \
+    && wget -q "https://archive.apache.org/dist/maven/maven-3/${MAVEN_VERSION}/binaries/apache-maven-${MAVEN_VERSION}-bin.tar.gz" -O /tmp/maven.tar.gz \
     && tar -xzf /tmp/maven.tar.gz -C /opt \
     && ln -s /opt/apache-maven-${MAVEN_VERSION}/bin/mvn /usr/local/bin/mvn \
     && rm /tmp/maven.tar.gz \

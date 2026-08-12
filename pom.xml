@@ -23,9 +23,7 @@
         inventory-service) under services/.
     </description>
 
-    <!-- =====================================================================
-         Module paths — two levels deep so relativePath in child POMs is ../../pom.xml
-    ===================================================================== -->
+    
     <modules>
         <module>platform/eureka-server</module>
         <module>platform/config-server</module>
@@ -34,9 +32,7 @@
         <module>services/inventory-service</module>
     </modules>
 
-    <!-- =====================================================================
-         Common properties
-    ===================================================================== -->
+
     <properties>
         <java.version>25</java.version>
         <maven.compiler.release>25</maven.compiler.release>
@@ -45,12 +41,10 @@
         <!-- Resilience4J 2.4.0 — Spring Boot 4.x compatible starter is resilience4j-spring-boot4 -->
         <resilience4j.version>2.4.0</resilience4j.version>
         <jjwt.version>0.12.6</jjwt.version>
-    </properties>
+    </properties>   
 
-    <!-- =====================================================================
-         Dependency Management — import Spring Cloud BOM so child POMs
-         only need to name starters without versions.
-    ===================================================================== -->
+    <!-- Dependency Management — import Spring Cloud BOM so child POMs
+    only need to name starters without versions. -->
     <dependencyManagement>
         <dependencies>
             <!-- Spring Cloud BOM — covers eureka, config, gateway, feign, loadbalancer -->
@@ -104,9 +98,7 @@
         </dependencies>
     </dependencyManagement>
 
-    <!-- =====================================================================
-         Dependencies shared by ALL modules
-    ===================================================================== -->
+    <!-- Dependencies shared by ALL modules -->
     <dependencies>
         <!-- Actuator endpoints: /actuator/health used by Eureka health checks -->
         <dependency>
@@ -127,11 +119,9 @@
         </dependency>
     </dependencies>
 
-    <!-- =====================================================================
-         Build — repackage plugin inherited by all Spring Boot child modules.
-         maven-compiler-plugin: Lombok must be declared in annotationProcessorPaths
-         with JDK 17+ to ensure @Data/@Builder/@NoArgsConstructor generate correctly.
-    ===================================================================== -->
+    <!-- Build — repackage plugin inherited by all Spring Boot child modules.
+    maven-compiler-plugin: Lombok must be declared in annotationProcessorPaths
+    with JDK 17+ to ensure @Data/@Builder/@NoArgsConstructor generate correctly. -->
     <build>
         <pluginManagement>
             <plugins>
@@ -167,21 +157,27 @@
                 <plugin>
                     <groupId>org.jacoco</groupId>
                     <artifactId>jacoco-maven-plugin</artifactId>
-                    <version>0.8.12</version>
+                    <version>0.8.13</version>
                     <executions>
                         <execution>
                             <id>jacoco-prepare-agent</id>
-                            <goals><goal>prepare-agent</goal></goals>
+                            <goals>
+                                <goal>prepare-agent</goal>
+                            </goals>
                         </execution>
                         <execution>
                             <id>jacoco-report</id>
                             <phase>verify</phase>
-                            <goals><goal>report</goal></goals>
+                            <goals>
+                                <goal>report</goal>
+                            </goals>
                         </execution>
                         <execution>
                             <id>jacoco-check</id>
                             <phase>verify</phase>
-                            <goals><goal>check</goal></goals>
+                            <goals>
+                                <goal>check</goal>
+                            </goals>
                             <configuration>
                                 <rules>
                                     <rule>

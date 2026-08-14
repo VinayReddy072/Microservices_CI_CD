@@ -1,6 +1,6 @@
 # Emergency Equipment Lending Platform
 
-A robust microservices-based platform designed to facilitate the lending and management of emergency equipment. Built with Spring Boot, Spring Cloud, and orchestrated with Docker.
+A microservices-based platform designed to facilitate the lending and management of emergency equipment. Built with Spring Boot, Spring Cloud, and orchestrated with Docker.
 
 ## Architecture
 

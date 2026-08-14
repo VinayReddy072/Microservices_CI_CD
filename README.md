@@ -42,7 +42,7 @@ To run the services individually for development:
 
 This project utilizes GitHub Actions for continuous integration. The pipeline automatically:
 - Checks out the code
-- Sets up Java
+- Sets up Java 25 
 - Runs Maven builds and integration tests
 - Enforces Checkstyle and PMD static analysis rules
 - Generates JaCoCo test coverage reports

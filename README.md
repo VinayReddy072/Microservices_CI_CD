@@ -1,4 +1,4 @@
-# Emergency Equipment Lending Platform
+# Emergency Equipment Lending Platform_ CI_CD
 
 A microservices-based platform designed to facilitate the lending and management of emergency equipment. Built with Spring Boot, Spring Cloud, and orchestrated with Docker.
 

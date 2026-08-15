@@ -100,7 +100,7 @@ class LoanRequestServiceTest {
 
                 LoanRequest result = service.approve(1L);
 
-                assertThat(result.getStatus()).isEqualTo(LoanStatus.REJECTED);
+                assertThat(result.getStatus()).isEqualTo(LoanStatus.APPROVED);
                 verify(eventPublisher).publishApproved(any());
         }
 
